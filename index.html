@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.5.1/axios.min.js" integrity="sha512-emSwuKiMyYedRwflbZB2ghzX8Cw8fmNVgZ6yQNNXXagFzFOaQmbvQ1vmDkddHjm5AITcBIZfC7k4ShQSjgPAmQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
+<body>
+
+
+    <div class="container-fluid">
+
+        <h1 class="row">Login</h1>
+
+        <main>
+            <form>
+                <div class="mb-3">
+                    <label for="username" class="form-label">Username</label>
+                    <input type="text" class="form-control" id="username" placeholder="Enter your username">
+                </div>
+
+                <div class="mb-3">
+                    <label for="password" class="form-label">Password</label>
+                    <input type="password" class="form-control" id="password" placeholder="Enter your password">
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-primary" onclick="login()">Login</button>
+                </div>
+            </form>
+        </main>
+    </div>
+    <script>
+        function login() {
+            const data = {
+                username: document.getElementById('username').value,
+                password: document.getElementById('password').value
+            };
+
+            axios.post('/api/login', data).then(res => {
+                if(res && res.data && res.data.success) {
+                    const token = res.data.token;
+                    localStorage.setItem('jwt', token);
+                    getDashboard();
+                }
+            });
+        }
+
+        function getDashboard() {
+            const token = localStorage.getItem('jwt')
+            axios.get('/api/dashboard', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            }).then(res => {
+                if(res && res.data && res.data.success) {
+                    document.querySelector('h1.row').innerHTML = "Dashboard Page"
+                    document.querySelector('main').innerHTML = res.data.content;
+
+                    if(document.querySelector('button') != null) {
+                        document.querySelector('button').innerHTML = "Settings";
+                        document.querySelector('button').onclick = getSettings;
+                    } else {
+                        var settingBtn = document.createElement('button')
+                        settingBtn.innerHTML = "Settings";
+                        settingBtn.className = "btn btn-primary";
+                        settingBtn.onclick = getSettings;
+                        document.querySelector('main').insertAdjacentElement('afterend',settingBtn);
+                    }
+                    //Use the HTML5 API History.pushstateLinks to an external site. to update the URL when you change routes
+                    history.pushState({}, null, '/dashboard');
+                }
+            }).catch(err => {
+                if(err.response && err.response.status == 401) {
+                    localStorage.removeItem('jwt');
+                    window.location.href = '/'
+                }
+            })
+        }
+
+        function getSettings() {
+            const token = localStorage.getItem('jwt')
+            axios.get('/api/settings', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            }).then(res => {
+                if(res && res.data && res.data.success) {
+                    document.querySelector('h1.row').innerHTML = "Settings Page"
+                    document.querySelector('main').innerHTML = res.data.content;
+                    document.querySelector('button').innerHTML = "Dashboard";
+                    document.querySelector('button').onclick = getDashboard;
+                    //Use the HTML5 API History.pushstateLinks to an external site. to update the URL when you change routes
+                    history.pushState({}, null, '/settings');
+                } 
+            }).catch(err => {
+                if(err.response && err.response.status == 401) {
+                    localStorage.removeItem('jwt');
+                    window.location.href = '/'
+                }
+            })
+        }
+
+        function isTokenExpired(token) {
+            const tokenParts = token.split('.');
+            if (tokenParts.length !== 3) {
+                return true; // Invalid token format, consider it expired
+            }
+
+            const payload = JSON.parse(atob(tokenParts[1])); // Decoding the payload part
+            const tokenIssuedAt = payload.iat; // Get the token's issued timestamp
+            const currentTimestamp = Math.floor(Date.now() / 1000); // Get the current timestamp in seconds
+
+            return currentTimestamp - tokenIssuedAt > 180; // Check if more than 3 minutes (180 seconds) have passed
+        }
+
+        function reloadPage() {
+            window.location.href = '/';
+        }
+
+        //In the frontend, implement some code so that if JWT is expired, then the page will reload on the root address
+        function onLoad() {
+            const token = localStorage.getItem('jwt');
+            if (token) {
+                if (isTokenExpired(token)) {
+                    reloadPage(); // Token is expired, reload the page
+                } else {
+                    getDashboard(); // Token is valid, load the dashboard
+                }
+            } else {
+                reloadPage(); // No token exists, reload the page
+            }
+        }
+
+        onLoad();
+    </script>     
+</body>
+</html>
